@@ -8,4 +8,7 @@ export default defineConfig({
     plugins: [tailwindcss()],
   }),
   srcDir: "src",
+  manifest: {
+    permissions: ["contextMenus", "storage"],
+  },
 });

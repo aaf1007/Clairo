@@ -25,7 +25,7 @@ load_dotenv()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # STARTUP — runs once when the server process starts
-    print("VeriFact API starting up...")
+    print("VerifAI API starting up...")
 
     # Warn early if keys are missing so the error is obvious in logs,
     # rather than appearing as a cryptic 500 error on the first request.
@@ -49,8 +49,8 @@ async def lifespan(app: FastAPI):
 # auto-generated docs at http://localhost:8000/docs (Swagger UI).
 # Passing `lifespan=lifespan` wires up our startup/shutdown handler above.
 app = FastAPI(
-    title="VeriFact API",
-    description="AI-powered fact-checking backend for the VeriFact Chrome extension",
+    title="VerifAI API",
+    description="AI-powered fact-checking backend for the VerifAI Chrome extension",
     version="0.1.0",
     lifespan=lifespan,
 )
@@ -99,4 +99,4 @@ app.include_router(transcribe.router)
 @app.get("/health", tags=["system"])
 async def health():
     """Simple health check endpoint."""
-    return {"status": "ok", "service": "verifact"}
+    return {"status": "ok", "service": "verifai"}

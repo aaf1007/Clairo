@@ -1,3 +1,4 @@
+import asyncio
 import json
 from pathlib import Path
 
@@ -44,25 +45,39 @@ async def verify_claim(client: genai.Client, claim: str) -> ClaimAnalysis:
         This function does not raise. JSON parse failures are caught internally
         and returned as a ClaimAnalysis with verdict=UNVERIFIABLE.
     """
-    # client.aio is the async namespace of the Gemini SDK.
-    # Using `await` here means this coroutine suspends while waiting for Gemini
-    # to respond, allowing other async work (e.g. other requests) to run in the meantime.
-    response = await client.aio.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=f"Fact-check this claim: {claim}",
-        config=types.GenerateContentConfig(
-            # The system instruction primes Gemini's behavior — it tells the model
-            # to respond with a specific JSON format and to reason like a fact-checker.
-            system_instruction=SYSTEM_PROMPT,
-            # Passing a GoogleSearch tool enables Google Search Grounding.
-            # Gemini will query Google before answering, and the results are
-            # reflected in both the text response and the grounding_metadata.
-            tools=[types.Tool(google_search=types.GoogleSearch())],
-            # Low temperature = more deterministic, less creative. Good for
-            # structured fact-checking where we want consistent JSON output.
-            temperature=0.1,
-        ),
-    )
+    # Retry once on 429 rate-limit errors using the suggested retry delay.
+    # This handles per-minute quota hits gracefully without crashing the request.
+    for attempt in range(2):
+        try:
+            response = await client.aio.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=f"Fact-check this claim: {claim}",
+                config=types.GenerateContentConfig(
+                    system_instruction=SYSTEM_PROMPT,
+                    tools=[types.Tool(google_search=types.GoogleSearch())],
+                    temperature=0.1,
+                ),
+            )
+            break  # success — exit retry loop
+        except Exception as e:
+            if "429" in str(e) and attempt == 0:
+                # Extract suggested retry delay from the error, default to 10s
+                import re
+                match = re.search(r"retry[^\d]*(\d+(?:\.\d+)?)", str(e), re.IGNORECASE)
+                delay = float(match.group(1)) + 1 if match else 10
+                print(f"Gemini rate limited, retrying in {delay}s...")
+                await asyncio.sleep(delay)
+            else:
+                # Daily quota exhausted or non-retryable error — degrade gracefully
+                print(f"Gemini failed for claim '{claim[:50]}': {e}")
+                return ClaimAnalysis(
+                    statement=claim,
+                    verdict=Verdict.UNVERIFIABLE,
+                    confidence=0.0,
+                    explanation="Verification unavailable (API quota exceeded).",
+                    sources=[],
+                    domain="other",
+                )
 
     # response.text is the raw text the model generated (our verdict JSON).
     content = response.text
@@ -138,11 +153,11 @@ async def verify_claims(client: genai.Client, claims: list) -> list[ClaimAnalysi
     Returns:
         A list of ClaimAnalysis objects in the same order as the input claims.
     """
-    results = []
-    for extracted in claims:
-        analysis = await verify_claim(client, extracted.claim)
-        # Carry the checkability rating (high/medium/low) from the extraction
-        # stage into the final result — the claim extractor assessed this, not Gemini.
+    # Verify all claims concurrently instead of sequentially.
+    # With N claims each taking ~3s, sequential = N*3s; concurrent = ~3s regardless of N.
+    analyses = await asyncio.gather(*[verify_claim(client, extracted.claim) for extracted in claims])
+
+    for analysis, extracted in zip(analyses, claims):
         analysis.checkability = extracted.checkability
-        results.append(analysis)
-    return results
+
+    return list(analyses)

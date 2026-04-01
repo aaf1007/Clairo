@@ -84,6 +84,7 @@ async def fact_check(
     try:
         results = await verify_claims(gemini, claims)
     except Exception as e:
+        print(f"Gemini error: {type(e).__name__}: {e}")
         raise HTTPException(status_code=502, detail=f"Gemini API error: {str(e)}")
 
     # Step 4: Aggregate the individual verdicts into a single overall verdict

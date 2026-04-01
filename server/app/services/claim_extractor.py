@@ -45,15 +45,25 @@ async def extract_claims(client: httpx.AsyncClient, text: str, context: str | No
 
     response.raise_for_status()
     data = response.json()
-    content = data ["choices"][0]["message"]["content"]
+    content = data["choices"][0]["message"]["content"]
 
-    # Parse the JSON array from the response and convert to ExtractedClaim objects
-    raw = json.loads(content)
+    # Strip markdown code fences if the model wrapped the JSON
+    first_bracket = content.find("[")
+    last_bracket = content.rfind("]")
+    if first_bracket != -1 and last_bracket != -1:
+        content = content[first_bracket:last_bracket + 1]
+
+    try:
+        raw = json.loads(content)
+    except json.JSONDecodeError:
+        return []
+
     return [
         ExtractedClaim(
             claim=item["claim"],
             checkability=Checkability(item.get("checkability", "medium")),
         )
         for item in raw
+        if "claim" in item
     ]
 
