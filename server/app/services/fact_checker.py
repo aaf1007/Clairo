@@ -78,12 +78,12 @@ async def verify_claim(client: genai.Client, claim: str) -> ClaimAnalysis:
 
     # LLMs sometimes wrap JSON in markdown code fences like ```json ... ```.
     # We detect this and slice out just the JSON object between { and }.
-    cleaned = content.strip()
-    if cleaned.startswith("```"):
-        first_brace = cleaned.find("{")
-        last_brace = cleaned.rfind("}")
-        if first_brace != -1 and last_brace != -1:
-            cleaned = cleaned[first_brace:last_brace + 1]
+    first_brace = content.find("{")
+    last_brace = content.rfind("}")
+    if first_brace != -1 and last_brace != -1:
+        cleaned = content[first_brace:last_brace + 1]
+    else:
+        cleaned = content.strip()
 
     # Parse the JSON. If the model returned something unparseable, we degrade
     # gracefully to UNVERIFIABLE rather than crashing the whole request.
