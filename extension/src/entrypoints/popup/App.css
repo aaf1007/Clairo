@@ -1,3 +1,7 @@
-#root {
-  width: 420px;
+@import "tailwindcss";
+
+body {
+  width: 440px;
+  height: 620px;
+  font-size: 16px;
 }

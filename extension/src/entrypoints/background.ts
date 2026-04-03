@@ -35,10 +35,6 @@ export default defineBackground(() => {
       id: "verifai-check",
       title: "VerifAI: Verify Text",
       contexts: ["selection"],
-      icons: {
-        "16": "/verifai-icon.svg",
-        "32": "/verifai-icon.svg",
-      },
     } as Parameters<typeof browser.contextMenus.create>[0]);
   });
 

@@ -10,5 +10,12 @@ export default defineConfig({
   srcDir: "src",
   manifest: {
     permissions: ["contextMenus", "storage"],
+    icons: {
+      "16": "/verifai/16.png",
+      "32": "/verifai/32.png",
+      "48": "/verifai/48.png",
+      "96": "/verifai/96.png",
+      "128": "/verifai/128.png",
+    },
   },
 });
