@@ -1,7 +1,8 @@
-import { ResultEntry } from "../App";
-import { useEffect, useId, useRef, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { Spinner } from "@/components/ui/spinner";
 import { useOutsideClick } from "@/hooks/use-outside-click";
+import { AnimatePresence, motion } from "motion/react";
+import { useEffect, useId, useRef, useState } from "react";
+import { ResultEntry } from "../App";
 
 export default function ClaimCard({ claim }: { claim: ResultEntry }) {
   const [active, setActive] = useState(false);
@@ -20,10 +21,15 @@ export default function ClaimCard({ claim }: { claim: ResultEntry }) {
 
   if (claim.status === "loading") {
     return (
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
-        <div className="w-4 h-4 rounded-full border-2 border-black border-t-transparent animate-spin shrink-0" />
-        <span className="text-sm text-gray-500">Checking claim...</span>
-      </div>
+      <motion.div
+        layoutId={`card-${id}`}
+        onClick={() => setActive(true)}
+        className="flex text-sm text-gray-500 items-center border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors shadow-xl px-8 py-6 rounded-xl"
+      >
+        {/* <div className="w-4 h-4 rounded-full border-2 border-black border-t-transparent animate-spin shrink-0" /> */}
+        <span className="">Checking claim</span>
+        <Spinner className="size-3"/>
+      </motion.div>
     );
   }
 
@@ -37,9 +43,6 @@ export default function ClaimCard({ claim }: { claim: ResultEntry }) {
 
   const result = claim.result!;
 
-  {
-    /* When claim is complete */
-  }
   return (
     <>
       <AnimatePresence>
@@ -64,10 +67,10 @@ export default function ClaimCard({ claim }: { claim: ResultEntry }) {
               {/* Header */}
               <div className="flex justify-between items-start p-4 border-b border-gray-100">
                 <div>
-                  <VerdictBadge verdict={result.overall_verdict} />
-                  <p className="text-xs text-gray-400 mt-1">
+                  <VerdictBadge verdict={result.overall_verdict.replaceAll("_"," ")} />
+                  {/* <p className="text-xs text-gray-400 mt-1">
                     {new Date(result.checked_at).toLocaleTimeString()}
-                  </p>
+                  </p> */}
                 </div>
                 <button
                   onClick={() => setActive(false)}
@@ -83,7 +86,7 @@ export default function ClaimCard({ claim }: { claim: ResultEntry }) {
               </div>
 
               {/* Claims list */}
-              <div className="overflow-y-auto px-4 pb-4 flex flex-col gap-3 mt-3">
+              <div className="modal-claims-scroll overflow-y-auto px-4 pb-4 flex flex-col gap-3 mt-3">
                 {result.claims.map((claim, i) => (
                   <div
                     key={i}
@@ -93,7 +96,7 @@ export default function ClaimCard({ claim }: { claim: ResultEntry }) {
                       <p className="text-xs font-medium text-gray-800 leading-snug">
                         {claim.statement}
                       </p>
-                      <VerdictBadge verdict={claim.verdict} small />
+                      <VerdictBadge verdict={claim.verdict.replaceAll("_"," ")} small />
                     </div>
                     <p className="text-xs text-gray-500">{claim.explanation}</p>
                     {claim.sources.length > 0 && (
@@ -126,10 +129,10 @@ export default function ClaimCard({ claim }: { claim: ResultEntry }) {
       <motion.div
         layoutId={`card-${id}`}
         onClick={() => setActive(true)}
-        className="flex items-center justify-between px-4 py-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
+        className="flex px-8 py-6 items-center justify-between border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors shadow-xl rounded-xl"
       >
         <div className="flex flex-col gap-0.5 min-w-0">
-          <VerdictBadge verdict={result.overall_verdict} />
+          <VerdictBadge verdict={result.overall_verdict.replaceAll("_"," ")} />
           <p className="text-xs text-gray-500 truncate">{result.summary}</p>
         </div>
         <span className="text-xs text-gray-400 ml-3 shrink-0">
@@ -150,15 +153,15 @@ function VerdictBadge({
   const lower = verdict.toLowerCase();
   const color =
     lower.includes("true") || lower.includes("accurate")
-      ? "bg-green-100 text-green-700"
+      ? "text-green-700"
       : lower.includes("false") || lower.includes("mislead")
-        ? "bg-red-100 text-red-700"
-        : "bg-yellow-100 text-yellow-700";
+        ? "text-red-700"
+        : "text-yellow-700";
 
   return (
     <span
-      className={`inline-block rounded-full font-semibold ${color} ${
-        small ? "text-[10px] px-2 py-0.5" : "text-xs px-2.5 py-0.5"
+      className={`inline-block rounded-full font-extrabold ${color} ${
+        small ? "text-[10px] py-0.5" : "text-xs py-0.5"
       }`}
     >
       {verdict}

@@ -1,7 +1,43 @@
 @import "tailwindcss";
+@import "@heroui/styles"; 
 
 body {
-  width: 440px;
+  width: 400px;
   height: 620px;
   font-size: 16px;
+  overflow: hidden;
+  scrollbar-width: none;
+}
+
+body::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hidden-until-hover scrollbar for the modal claims list */
+.modal-claims-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.2s ease;
+}
+
+.modal-claims-scroll:hover {
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+.modal-claims-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.modal-claims-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modal-claims-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 9999px;
+  transition: background 0.2s ease;
+}
+
+.modal-claims-scroll:hover::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
 }

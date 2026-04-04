@@ -16,6 +16,14 @@ from app.services.text_cleaner import clean_text
 # tags=["fact-check"] groups them together in the Swagger UI at /docs.
 router = APIRouter(prefix="/api", tags=["fact-check"])
 
+SUMMARY_SYSTEM_PROMPT = (
+    "You summarize fact-check results for a browser extension popup card. "
+    "Write exactly 2 sentences. "
+    "Sentence 1: one natural-language sentence describing what topic/subject the selected text is about (do not quote it). "
+    "Sentence 2: a comma-separated list of the key claims that were checked, ending with a period. "
+    "Total response must be under 220 characters. Be concise."
+)
+
 
 # @router.post("/fact-check") registers this function as the handler for
 # POST /api/fact-check. The `response_model` tells FastAPI which Pydantic
@@ -90,7 +98,7 @@ async def fact_check(
     # Step 4: Aggregate the individual verdicts into a single overall verdict
     # and build a human-readable summary string.
     overall = _aggregate_verdict(results)
-    summary = _build_summary(results)
+    summary = await _build_summary(groq, cleaned, results)
 
     # FastAPI automatically serializes this Pydantic model to JSON.
     return FactCheckResponse(
@@ -121,19 +129,43 @@ def _aggregate_verdict(claims) -> Verdict:
     return Verdict.MOSTLY_TRUE
 
 
-def _build_summary(claims) -> str:
-    """Build the human-readable summary string shown in the popup bubble."""
-    total = len(claims)
-    true_count = sum(1 for c in claims if c.verdict in (Verdict.TRUE, Verdict.MOSTLY_TRUE))
-    false_count = sum(1 for c in claims if c.verdict in (Verdict.FALSE, Verdict.MOSTLY_FALSE))
-    unverified = sum(1 for c in claims if c.verdict == Verdict.UNVERIFIABLE)
+async def _build_summary(groq: httpx.AsyncClient, selected_text: str, claims) -> str:
+    """Build a qualitative 2-sentence summary using Groq.
 
-    parts = []
-    parts.append(f"Analyzed {total} claim{'s' if total != 1 else ''}.")
-    if true_count:
-        parts.append(f"{true_count} verified as true or mostly true.")
-    if false_count:
-        parts.append(f"{false_count} found to be false or misleading.")
-    if unverified:
-        parts.append(f"{unverified} could not be verified.")
-    return " ".join(parts)
+    Sentence 1 identifies the topic of the selected text.
+    Sentence 2 lists the key claims that were checked.
+    Falls back to a quantitative summary if the Groq call fails.
+    """
+    try:
+        claim_list = "; ".join(c.statement for c in claims)
+        prompt = (
+            f"Selected text (may be long): {selected_text[:500]}\n\n"
+            f"Claims checked: {claim_list}"
+        )
+        response = await groq.post(
+            "/chat/completions",
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": SUMMARY_SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0.2,
+                "max_tokens": 100,
+            },
+        )
+        response.raise_for_status()
+        return response.json()["choices"][0]["message"]["content"].strip()
+    except Exception:
+        total = len(claims)
+        true_count = sum(1 for c in claims if c.verdict in (Verdict.TRUE, Verdict.MOSTLY_TRUE))
+        false_count = sum(1 for c in claims if c.verdict in (Verdict.FALSE, Verdict.MOSTLY_FALSE))
+        unverified = sum(1 for c in claims if c.verdict == Verdict.UNVERIFIABLE)
+        parts = [f"Analyzed {total} claim{'s' if total != 1 else ''}."]
+        if true_count:
+            parts.append(f"{true_count} verified as true or mostly true.")
+        if false_count:
+            parts.append(f"{false_count} found to be false or misleading.")
+        if unverified:
+            parts.append(f"{unverified} could not be verified.")
+        return " ".join(parts)

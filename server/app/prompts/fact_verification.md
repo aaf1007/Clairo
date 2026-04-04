@@ -30,6 +30,7 @@ Source priority (use the most authoritative sources available for the domain):
 - Finance: SEC filings, central bank publications, Bloomberg, Reuters
 - Technology: Official documentation, company announcements, IEEE, ACM
 - General: Established news outlets (AP, Reuters), official records, academic institutions
+- Only Pick the 3 most relaible, credibleand best sources
 
 Rules:
 - Be specific in your explanation. Cite what sources say, not just that they exist.
