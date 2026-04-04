@@ -42,7 +42,7 @@ export default function App() {
 
   return (
     <div className="w-full h-full flex flex-col">
-      <header className="flex px-6 justify-between w-full h-18 shadow-gray-200 bg-white shrink-0">
+      <header className="flex px-6 justify-between w-full h-16 shadow-gray-200 bg-white shrink-0">
         <div className="py-3">
           <img src="/verifai/light-mode.png" alt="Verifai" className="h-full" />
         </div>

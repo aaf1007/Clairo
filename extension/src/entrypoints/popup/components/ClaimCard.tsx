@@ -1,7 +1,9 @@
 import { Spinner } from "@/components/ui/spinner";
 import { useOutsideClick } from "@/hooks/use-outside-click";
+import { Label, ProgressBar } from "@heroui/react";
 import { AnimatePresence, motion } from "motion/react";
 import { RefObject, useEffect, useId, useRef, useState } from "react";
+import { FaSquareCheck } from "react-icons/fa6";
 import type { FactCheckResponse } from "../../background";
 import { ResultEntry } from "../App";
 
@@ -72,10 +74,11 @@ export default function ClaimCard({ claim }: { claim: ResultEntry }) {
       <motion.div
         layoutId={`card-${id}`}
         onClick={() => setActive(true)}
-        className="flex px-8 py-6 items-center justify-between border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors shadow-lg rounded-xl"
+        className="flex px-4 py-2 items-center gap-6 border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors shadow-lg rounded-xl"
       >
+        <FaSquareCheck className={`text-3xl opacity-40 ${getVerdictColor(result.overall_verdict)}`} />
         <div className="flex flex-col gap-0.5 min-w-0">
-          <p>{result.title}</p>
+          <p className="font-semibold text-[0.9rem]">{result.title}</p>
           <div className="flex items-end">
             <VerdictBadge verdict={result.overall_verdict.replaceAll("_"," ")} />
             <span className="text-gray-400 ml-3 text-[10px] py-0.5">
@@ -187,9 +190,13 @@ export function ClaimCardContent({ result, defaultExpanded = 0, inline = false }
                       ))}
                     </div>
                   )}
-                  <div className="mt-1 text-[10px] text-gray-400">
-                    Confidence: {Math.round(claim.confidence * 100)}%
-                  </div>
+                    <ProgressBar className="mt-2 progress-bar--sm" aria-label="Confidence" value={Math.round(claim.confidence * 100)}>
+                    <Label className="text-[0.7rem] text-gray-400">Confidence Level</Label>
+                    <ProgressBar.Output className="text-[0.7rem] text-gray-400"/>
+                    <ProgressBar.Track >
+                      <ProgressBar.Fill />
+                    </ProgressBar.Track>
+                  </ProgressBar>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -199,6 +206,15 @@ export function ClaimCardContent({ result, defaultExpanded = 0, inline = false }
     </>
   );
 }
+
+export const getVerdictColor = (verdict: string) => {
+  const lower = verdict.toLowerCase();
+  return lower.includes("true") || lower.includes("accurate")
+    ? "text-green-700"
+    : lower.includes("false") || lower.includes("mislead")
+      ? "text-red-700"
+      : "text-yellow-700";
+};
 
 export function VerdictBadge({
   verdict,
@@ -218,7 +234,7 @@ export function VerdictBadge({
   return (
     <span
       className={`inline-block rounded-full font-extrabold ${color} ${
-        small ? "text-[10px] py-0.5" : "text-xs py-0.5"
+        small ? "text-[0.7rem] py-0.5" : "text-xs py-0.5"
       }`}
     >
       {verdict}
