@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import type { FactCheckResponse } from "../background";
 import "./App.css";
 import ClaimCard from "./components/ClaimCard";
+import { ClaimCardInline } from "./components/ClaimCardInline";
 
 export type ResultEntry = {
   status: "loading" | "done" | "error";
@@ -11,13 +12,16 @@ export type ResultEntry = {
 
 export default function App() {
   const [result, setResult] = useState<ResultEntry[]>([]);
-  const [view, setView] = useState<string>("list");
+  const [view, setView] = useState<string>("recent");
+  const [recent, setRecent] = useState<ResultEntry | undefined>();
 
   // Read existing results
   useEffect(() => {
     browser.storage.local.get("verifaiResults").then((data) => {
       if (data.verifaiResults) {
-        setResult(data.verifaiResults as ResultEntry[]);
+        const results = data.verifaiResults as ResultEntry[];
+        setResult(results);
+        setRecent(results.at(-1));
       }
     });
   }, []);
@@ -26,7 +30,9 @@ export default function App() {
   useEffect(() => {
     const listener = (changes: any) => {
       if (changes.verifaiResults) {
-        setResult(changes.verifaiResults.newValue as ResultEntry[]);
+        const newValue = changes.verifaiResults.newValue as ResultEntry[];
+        setResult(newValue);
+        setRecent(newValue.at(-1));
       }
     };
 
@@ -35,8 +41,8 @@ export default function App() {
   }, []);
 
   return (
-    <div className="w-full flex flex-col gap-4">
-      <header className="bg-white flex px-6 justify-between w-full h-14 shadow-gray-200">
+    <div className={`w-full h-full flex flex-col ${view === "recent" ? "overflow-y-auto" : ""}`}>
+      <header className="flex px-6 justify-between w-full h-18 shadow-gray-200 bg-white">
         <div className="py-3">
           <img src="/verifai/light-mode.png" alt="Verifai" className="h-full" />
         </div>
@@ -46,17 +52,22 @@ export default function App() {
       <Tabs
         selectedKey={view}
         onSelectionChange={(key) => setView(String(key))}
-        className="px-8"
+        className="px-8 mb-5"
+        variant='secondary'
       >
         <Tabs.ListContainer>
           <Tabs.List aria-label="View">
-            <Tabs.Tab id="list">
-              List View
-              <Tabs.Indicator />
+            <Tabs.Tab id="recent">
+              Recent
+              <Tabs.Indicator className="bg-[linear-gradient(90deg,rgba(28,4,17,1)_29%,rgba(124,35,83,1)_56%,rgba(197,95,89,1)_81%,rgba(210,105,116,1)_100%)]" />
             </Tabs.Tab>
-            <Tabs.Tab id="node">
-              Node View
-              <Tabs.Indicator />
+            <Tabs.Tab id="history">
+              History
+              <Tabs.Indicator className="bg-[linear-gradient(90deg,rgba(28,4,17,1)_29%,rgba(124,35,83,1)_56%,rgba(197,95,89,1)_81%,rgba(210,105,116,1)_100%)]" />
+            </Tabs.Tab>
+            <Tabs.Tab id="Chat">
+              Chat
+              <Tabs.Indicator className="bg-[linear-gradient(90deg,rgba(28,4,17,1)_29%,rgba(124,35,83,1)_56%,rgba(197,95,89,1)_81%,rgba(210,105,116,1)_100%)]" />
             </Tabs.Tab>
           </Tabs.List>
         </Tabs.ListContainer>
@@ -67,13 +78,16 @@ export default function App() {
           <p>Track your metrics and analyze performance data.</p>
         </Tabs.Panel> */}
       </Tabs>
-      <main className="px-8">
-        { view === "list" && result.map((cur) => (
+      <main className={`pb-4 px-8 ${view === "recent" ? "" : "flex-1 overflow-y-auto min-h-0"}`}>
+        { view === "recent" && (
+          <ClaimCardInline entry={recent} />
+        )}
+        { view === "history" && (
+          result.toReversed().map((cur) => (
           <ClaimCard claim={cur} key={cur.result?.checked_at} />
-        ))}
-
-        { view === "node" && 
-          <div>NODE VIEW</div>
+        )))}
+        { view === "Chat" && 
+          <div>{view} VIEW</div>
         }
       </main>
     </div>

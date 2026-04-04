@@ -1,7 +1,8 @@
 import { Spinner } from "@/components/ui/spinner";
 import { useOutsideClick } from "@/hooks/use-outside-click";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useId, useRef, useState } from "react";
+import { RefObject, useEffect, useId, useRef, useState } from "react";
+import type { FactCheckResponse } from "../../background";
 import { ResultEntry } from "../App";
 
 export default function ClaimCard({ claim }: { claim: ResultEntry }) {
@@ -58,70 +59,12 @@ export default function ClaimCard({ claim }: { claim: ResultEntry }) {
 
       <AnimatePresence>
         {active && (
-          <div className="fixed inset-0 grid place-items-center z-[100] px-4">
-            <motion.div
-              layoutId={`card-${id}`}
-              ref={ref}
-              className="w-full max-w-[400px] max-h-[80vh] flex flex-col bg-white rounded-2xl overflow-hidden shadow-xl"
-            >
-              {/* Header */}
-              <div className="flex justify-between items-start p-4 border-b border-gray-100">
-                <div>
-                  <VerdictBadge verdict={result.overall_verdict.replaceAll("_"," ")} />
-                  {/* <p className="text-xs text-gray-400 mt-1">
-                    {new Date(result.checked_at).toLocaleTimeString()}
-                  </p> */}
-                </div>
-                <button
-                  onClick={() => setActive(false)}
-                  className="text-gray-400 hover:text-black transition-colors"
-                >
-                  <CloseIcon />
-                </button>
-              </div>
-
-              {/* Summary */}
-              <div className="px-4 pt-3 pb-1">
-                <p className="text-sm text-gray-700">{result.summary}</p>
-              </div>
-
-              {/* Claims list */}
-              <div className="modal-claims-scroll overflow-y-auto px-4 pb-4 flex flex-col gap-3 mt-3">
-                {result.claims.map((claim, i) => (
-                  <div
-                    key={i}
-                    className="rounded-xl border border-gray-100 p-3"
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <p className="text-xs font-medium text-gray-800 leading-snug">
-                        {claim.statement}
-                      </p>
-                      <VerdictBadge verdict={claim.verdict.replaceAll("_"," ")} small />
-                    </div>
-                    <p className="text-xs text-gray-500">{claim.explanation}</p>
-                    {claim.sources.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {claim.sources.map((src, j) => (
-                          <a
-                            key={j}
-                            href={src}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-[10px] text-blue-500 underline truncate max-w-[180px]"
-                          >
-                            {src}
-                          </a>
-                        ))}
-                      </div>
-                    )}
-                    <div className="mt-1 text-[10px] text-gray-400">
-                      Confidence: {Math.round(claim.confidence * 100)}%
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          </div>
+          <ClaimCardModal
+            result={result}
+            id={id}
+            refProp={ref}
+            onClose={() => setActive(false)}
+          />
         )}
       </AnimatePresence>
 
@@ -143,7 +86,118 @@ export default function ClaimCard({ claim }: { claim: ResultEntry }) {
   );
 }
 
-function VerdictBadge({
+type ClaimCardModalProps = {
+  result: NonNullable<ResultEntry["result"]>;
+  id: string;
+  refProp: RefObject<HTMLDivElement | null>;
+  onClose?: () => void;
+};
+
+/** Expanded modal view for a single fact-check result. */
+export function ClaimCardModal({ result, id, refProp, onClose }: ClaimCardModalProps) {
+  return (
+    <div className="fixed inset-0 grid place-items-center z-[100] px-4">
+      <motion.div
+        layoutId={`card-${id}`}
+        ref={refProp}
+        className="w-full max-w-[400px] max-h-[80vh] flex flex-col bg-white rounded-2xl overflow-hidden shadow-xl"
+      >
+        {/* Header */}
+        <div className="flex justify-between items-start p-4 border-b border-gray-100">
+          <div>
+            <VerdictBadge verdict={result.overall_verdict.replaceAll("_", " ")} />
+          </div>
+          {onClose && 
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-black transition-colors"
+          >
+            <CloseIcon />
+          </button>}
+        </div>
+        <ClaimCardContent result={result} />
+      </motion.div>
+    </div>
+  );
+}
+
+type ClaimCardContentProps = {
+  result: FactCheckResponse;
+  /** Index of the initially expanded claim. Defaults to 0. */
+  defaultExpanded?: number;
+  /** When true, disables the inner scroll so a parent container can handle scrolling. */
+  inline?: boolean;
+};
+
+/** Shared inner body: summary + accordion claims list. */
+export function ClaimCardContent({ result, defaultExpanded = 0, inline = false }: ClaimCardContentProps) {
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(defaultExpanded);
+
+  /** Toggles accordion: collapses if already open, expands otherwise. */
+  const handleToggleClaim = (i: number) =>
+    setExpandedIndex((prev) => (prev === i ? null : i));
+
+  return (
+    <>
+      {/* Summary */}
+      <div className="px-4 pt-3 pb-1">
+        <p className="text-sm text-gray-700">{result.summary}</p>
+      </div>
+
+      {/* Claims accordion */}
+      <div className={`px-4 pb-4 flex flex-col gap-3 mt-3${inline ? "" : " modal-claims-scroll overflow-y-auto"}`}>
+        {result.claims.map((claim, i) => (
+          <div
+            key={i}
+            className="rounded-xl border border-gray-200 bg-white shadow-sm p-3 cursor-pointer"
+            onClick={() => handleToggleClaim(i)}
+          >
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <p className="text-xs font-medium text-gray-800 leading-snug">
+                {claim.statement}
+              </p>
+              <VerdictBadge verdict={claim.verdict.replaceAll("_", " ")} small />
+            </div>
+            <AnimatePresence initial={false}>
+              {expandedIndex === i && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <p className="text-xs text-gray-500 mt-1">{claim.explanation}</p>
+                  {claim.sources.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {claim.sources.map((src, j) => (
+                        <a
+                          key={j}
+                          href={src}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-[10px] text-blue-500 underline truncate max-w-[180px]"
+                        >
+                          {src}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                  <div className="mt-1 text-[10px] text-gray-400">
+                    Confidence: {Math.round(claim.confidence * 100)}%
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+export function VerdictBadge({
   verdict,
   small,
 }: {

@@ -1,16 +1,25 @@
 @import "tailwindcss";
 @import "@heroui/styles"; 
 
+:root {
+  --gradient: linear-gradient(90deg, rgba(28, 4, 17, 1) 29%, rgba(124, 35, 83, 1) 56%, rgba(197, 95, 89, 1) 81%, rgba(210, 105, 116, 1) 100%);
+}
+
 body {
-  width: 400px;
-  height: 620px;
+  width: 440px;
+  height: 720px;
   font-size: 16px;
   overflow: hidden;
   scrollbar-width: none;
+  background-color: white;
 }
 
 body::-webkit-scrollbar {
   display: none;
+}
+
+[data-slot="indicator"] {
+  background: var(--gradient) !important;
 }
 
 /* Hidden-until-hover scrollbar for the modal claims list */
@@ -40,4 +49,12 @@ body::-webkit-scrollbar {
 
 .modal-claims-scroll:hover::-webkit-scrollbar-thumb {
   background: rgba(0, 0, 0, 0.2);
+}
+
+.heading {
+  background: #1C0411;
+background: -webkit-linear-gradient(90deg, rgba(28, 4, 17, 1) 29%, rgba(124, 35, 83, 1) 56%, rgba(197, 95, 89, 1) 81%, rgba(210, 105, 116, 1) 100%);
+background: -moz-linear-gradient(90deg, rgba(28, 4, 17, 1) 29%, rgba(124, 35, 83, 1) 56%, rgba(197, 95, 89, 1) 81%, rgba(210, 105, 116, 1) 100%);
+background: linear-gradient(90deg, rgba(28, 4, 17, 1) 29%, rgba(124, 35, 83, 1) 56%, rgba(197, 95, 89, 1) 81%, rgba(210, 105, 116, 1) 100%);
+filter: progid:DXImageTransform.Microsoft.gradient(startColorstr="#1C0411", endColorstr="#D26974", GradientType=1);
 }
