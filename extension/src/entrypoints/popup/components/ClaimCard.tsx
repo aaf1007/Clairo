@@ -72,15 +72,18 @@ export default function ClaimCard({ claim }: { claim: ResultEntry }) {
       <motion.div
         layoutId={`card-${id}`}
         onClick={() => setActive(true)}
-        className="flex px-8 py-6 items-center justify-between border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors shadow-xl rounded-xl"
+        className="flex px-8 py-6 items-center justify-between border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors shadow-lg rounded-xl"
       >
         <div className="flex flex-col gap-0.5 min-w-0">
-          <VerdictBadge verdict={result.overall_verdict.replaceAll("_"," ")} />
-          <p className="text-xs text-gray-500 truncate">{result.summary}</p>
+          <p>{result.title}</p>
+          <div className="flex items-end">
+            <VerdictBadge verdict={result.overall_verdict.replaceAll("_"," ")} />
+            <span className="text-gray-400 ml-3 text-[10px] py-0.5">
+              {result.claims.length} claim{result.claims.length !== 1 ? "s" : ""}
+            </span>
+            {/* <p className="text-xs text-gray-500 truncate">{result.summary}</p> */}
+          </div>
         </div>
-        <span className="text-xs text-gray-400 ml-3 shrink-0">
-          {result.claims.length} claim{result.claims.length !== 1 ? "s" : ""}
-        </span>
       </motion.div>
     </>
   );

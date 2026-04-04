@@ -7,6 +7,7 @@ type FactCheckRequest = {
 
 export type FactCheckResponse = {
   overall_verdict: string;
+  title: string;
   summary: string;
   claims: ClaimAnalysis[];
   checked_at: string;

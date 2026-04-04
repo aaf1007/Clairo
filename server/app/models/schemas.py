@@ -165,6 +165,7 @@ class FactCheckResponse(BaseModel):
             extension knows which page this result belongs to.
     """
     overall_verdict: Verdict
+    title: str
     summary: str
     claims: list[ClaimAnalysis]
     # default_factory calls datetime.utcnow() at object creation time.

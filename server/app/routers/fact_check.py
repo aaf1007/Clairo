@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 
 import httpx
@@ -18,10 +19,11 @@ router = APIRouter(prefix="/api", tags=["fact-check"])
 
 SUMMARY_SYSTEM_PROMPT = (
     "You summarize fact-check results for a browser extension popup card. "
-    "Write exactly 2 sentences. "
-    "Sentence 1: one natural-language sentence describing what topic/subject the selected text is about (do not quote it). "
-    "Sentence 2: a comma-separated list of the key claims that were checked, ending with a period. "
-    "Total response must be under 220 characters. Be concise."
+    "Respond with ONLY a JSON object with two fields — no markdown fences, no preamble:\n"
+    '{"title": "...", "summary": "..."}\n'
+    "title: a short 3-7 word noun phrase naming the topic (e.g. \"Climate Change and Sea Levels\"). No verdict words.\n"
+    "summary: exactly 2 sentences. Sentence 1: what the selected text is about. "
+    "Sentence 2: a comma-separated list of the key claims checked. Under 220 chars total."
 )
 
 
@@ -98,11 +100,12 @@ async def fact_check(
     # Step 4: Aggregate the individual verdicts into a single overall verdict
     # and build a human-readable summary string.
     overall = _aggregate_verdict(results)
-    summary = await _build_summary(groq, cleaned, results)
+    title, summary = await _build_summary(groq, cleaned, results)
 
     # FastAPI automatically serializes this Pydantic model to JSON.
     return FactCheckResponse(
         overall_verdict=overall,
+        title=title,
         summary=summary,
         claims=results,
         checked_at=datetime.utcnow(),
@@ -129,12 +132,10 @@ def _aggregate_verdict(claims) -> Verdict:
     return Verdict.MOSTLY_TRUE
 
 
-async def _build_summary(groq: httpx.AsyncClient, selected_text: str, claims) -> str:
-    """Build a qualitative 2-sentence summary using Groq.
+async def _build_summary(groq: httpx.AsyncClient, selected_text: str, claims) -> tuple[str, str]:
+    """Build a title and 2-sentence summary using Groq.
 
-    Sentence 1 identifies the topic of the selected text.
-    Sentence 2 lists the key claims that were checked.
-    Falls back to a quantitative summary if the Groq call fails.
+    Returns (title, summary). Falls back to generated values if the Groq call fails.
     """
     try:
         claim_list = "; ".join(c.statement for c in claims)
@@ -151,11 +152,13 @@ async def _build_summary(groq: httpx.AsyncClient, selected_text: str, claims) ->
                     {"role": "user", "content": prompt},
                 ],
                 "temperature": 0.2,
-                "max_tokens": 100,
+                "max_tokens": 120,
             },
         )
         response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"].strip()
+        raw = response.json()["choices"][0]["message"]["content"].strip()
+        parsed = json.loads(raw)
+        return parsed["title"], parsed["summary"]
     except Exception:
         total = len(claims)
         true_count = sum(1 for c in claims if c.verdict in (Verdict.TRUE, Verdict.MOSTLY_TRUE))
@@ -168,4 +171,4 @@ async def _build_summary(groq: httpx.AsyncClient, selected_text: str, claims) ->
             parts.append(f"{false_count} found to be false or misleading.")
         if unverified:
             parts.append(f"{unverified} could not be verified.")
-        return " ".join(parts)
+        return "Fact Check Result", " ".join(parts)
