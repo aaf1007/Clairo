@@ -41,8 +41,8 @@ export default function App() {
   }, []);
 
   return (
-    <div className={`w-full h-full flex flex-col ${view === "recent" ? "overflow-y-auto" : ""}`}>
-      <header className="flex px-6 justify-between w-full h-18 shadow-gray-200 bg-white">
+    <div className="w-full h-full flex flex-col">
+      <header className="flex px-6 justify-between w-full h-18 shadow-gray-200 bg-white shrink-0">
         <div className="py-3">
           <img src="/verifai/light-mode.png" alt="Verifai" className="h-full" />
         </div>
@@ -52,7 +52,7 @@ export default function App() {
       <Tabs
         selectedKey={view}
         onSelectionChange={(key) => setView(String(key))}
-        className="px-8 mb-5"
+        className="px-8 mb-5 shrink-0"
         variant='secondary'
       >
         <Tabs.ListContainer>
@@ -78,7 +78,7 @@ export default function App() {
           <p>Track your metrics and analyze performance data.</p>
         </Tabs.Panel> */}
       </Tabs>
-      <main className={`pb-4 px-8 ${view === "recent" ? "" : "flex-1 overflow-y-auto min-h-0"}`}>
+      <main className="pb-4 px-8 flex-1 overflow-y-auto min-h-0">
         { view === "recent" && (
           <ClaimCardInline entry={recent} />
         )}
