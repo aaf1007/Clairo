@@ -27,6 +27,9 @@ type ClaimAnalysis = {
 export default defineBackground(() => {
   console.log("Hello background!", { id: browser.runtime.id });
 
+  // Point the side panel at the popup page so sidePanel.open() has a path to load.
+  browser.sidePanel.setOptions({ path: "popup.html", enabled: true });
+
   // Remove all existing menus then recreate. This handles both:
   // - Production: avoids duplicate-id errors when the service worker restarts
   // - Development: onInstalled doesn't fire on WXT HMR reloads, so we can't
@@ -75,6 +78,10 @@ export default defineBackground(() => {
     // (the context menu click). Awaiting storage.set above is fast (local I/O)
     // so Chrome still considers this the same gesture context.
     await browser.action.openPopup();
+
+    if (tab?.windowId) {
+      await browser.sidePanel.open({ tabId: tab.id, windowId: tab.windowId });
+    }
 
     try {
       // API Call

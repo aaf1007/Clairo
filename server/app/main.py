@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.dependencies import close_clients
-from app.routers import fact_check, transcribe
+from app.routers import fact_check, transcribe, chatbot
 
 
 # Load environment variables from the .env file into os.getenv().
@@ -88,6 +88,7 @@ app.add_middleware(
 # Each router file defines its own prefix (e.g. /api), so you don't set it here.
 app.include_router(fact_check.router)
 app.include_router(transcribe.router)
+app.include_router(chatbot.router)
 
 
 # ──────────────────────────────────────────────

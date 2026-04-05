@@ -4,6 +4,7 @@ import type { FactCheckResponse } from "../background";
 import "./App.css";
 import ClaimCard from "./components/ClaimCard";
 import { ClaimCardInline } from "./components/ClaimCardInline";
+import ChatView from "./components/ChatView";
 
 export type ResultEntry = {
   status: "loading" | "done" | "error";
@@ -14,6 +15,12 @@ export default function App() {
   const [result, setResult] = useState<ResultEntry[]>([]);
   const [view, setView] = useState<string>("recent");
   const [recent, setRecent] = useState<ResultEntry | undefined>();
+  const [chatContextIndex, setChatContextIndex] = useState<number | null>(null);
+
+  const handleChatAbout = (index: number) => {
+    setChatContextIndex(index);
+    setView("Chat");
+  };
 
   // Read existing results
   useEffect(() => {
@@ -42,7 +49,7 @@ export default function App() {
 
   return (
     <div className="w-full h-full flex flex-col">
-      <header className="flex px-6 justify-between w-full h-16 shadow-gray-200 bg-white shrink-0">
+      <header className="flex justify-center w-full h-16 shadow-gray-200 bg-white shrink-0">
         <div className="py-3">
           <img src="/verifai/light-mode.png" alt="Verifai" className="h-full" />
         </div>
@@ -78,17 +85,25 @@ export default function App() {
           <p>Track your metrics and analyze performance data.</p>
         </Tabs.Panel> */}
       </Tabs>
-      <main className="pb-4 px-8 flex-1 overflow-y-auto min-h-0">
+      <main className={`px-8 flex-1 min-h-0 ${view === "Chat" ? "flex flex-col pb-4" : "pb-4 overflow-y-auto"}`}>
         { view === "recent" && (
-          <ClaimCardInline entry={recent} />
+          <ClaimCardInline entry={recent} onChatAbout={() => handleChatAbout(result.length - 1)} />
         )}
         { view === "history" && (
-          result.toReversed().map((cur) => (
-          <ClaimCard claim={cur} key={cur.result?.checked_at} />
+          result.toReversed().map((cur, displayIndex) => (
+          <ClaimCard
+            claim={cur}
+            key={cur.result?.checked_at}
+            onChatAbout={() => handleChatAbout(result.length - 1 - displayIndex)}
+          />
         )))}
-        { view === "Chat" && 
-          <div>{view} VIEW</div>
-        }
+        { view === "Chat" && (
+          <ChatView
+            results={result}
+            initialContextIndex={chatContextIndex}
+            onContextIndexChange={setChatContextIndex}
+          />
+        )}
       </main>
     </div>
   );

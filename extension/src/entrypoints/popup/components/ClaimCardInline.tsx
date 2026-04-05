@@ -5,10 +5,11 @@ import { ClaimCardContent, VerdictBadge } from "./ClaimCard";
 
 type ClaimCardInlineProps = {
   entry: ResultEntry | undefined;
+  onChatAbout?: () => void;
 };
 
 /** Inline (non-modal) view of the most recent fact-check result for the Recent tab. */
-export function ClaimCardInline({ entry }: ClaimCardInlineProps) {
+export function ClaimCardInline({ entry, onChatAbout }: ClaimCardInlineProps) {
   if (!entry) return <EmptyState />;
   if (entry.status === "loading") return <LoadingState />;
   if (entry.status === "error") return <ErrorState />;
@@ -23,15 +24,26 @@ export function ClaimCardInline({ entry }: ClaimCardInlineProps) {
       transition={{ duration: 0.25 }}
       className="flex flex-col"
     >
-      {/* Header row: verdict + timestamp */}
+      {/* Header row: verdict + chat button */}
       <div className="flex items-center justify-between">
         <VerdictBadge verdict={result.overall_verdict.replaceAll("_", " ")} />
-        {/* Claims count */}
-        <p className="text-[10px] text-gray-400 mb-3">
-          {result.claims.length} claim{result.claims.length !== 1 ? "s" : ""} checked
-        </p>
+        <div className="flex items-center gap-3">
+          {onChatAbout && (
+            <button
+              onClick={onChatAbout}
+              className="text-[10px] text-gray-400 hover:text-[#7c2353] transition-colors flex items-center gap-1"
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+              Chat about this
+            </button>
+          )}
+          <p className="text-[10px] text-gray-400">
+            {result.claims.length} claim{result.claims.length !== 1 ? "s" : ""} checked
+          </p>
+        </div>
       </div>
-
 
       {/* Shared content: summary + accordion claims */}
       <ClaimCardContent result={result} inline />

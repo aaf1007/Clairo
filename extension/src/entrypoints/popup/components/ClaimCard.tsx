@@ -7,7 +7,7 @@ import { FaSquareCheck } from "react-icons/fa6";
 import type { FactCheckResponse } from "../../background";
 import { ResultEntry } from "../App";
 
-export default function ClaimCard({ claim }: { claim: ResultEntry }) {
+export default function ClaimCard({ claim, onChatAbout }: { claim: ResultEntry; onChatAbout?: () => void }) {
   const [active, setActive] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const id = useId();
@@ -66,6 +66,7 @@ export default function ClaimCard({ claim }: { claim: ResultEntry }) {
             id={id}
             refProp={ref}
             onClose={() => setActive(false)}
+            onChatAbout={onChatAbout ? () => { setActive(false); onChatAbout(); } : undefined}
           />
         )}
       </AnimatePresence>
@@ -74,7 +75,7 @@ export default function ClaimCard({ claim }: { claim: ResultEntry }) {
       <motion.div
         layoutId={`card-${id}`}
         onClick={() => setActive(true)}
-        className="flex px-4 py-2 items-center gap-6 border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors shadow-lg rounded-xl"
+        className="flex px-4 py-2 items-center gap-6 mb-4 border border-gray-100 cursor-pointer hover:bg-gray-100 transition-colors shadow-lg rounded-xl"
       >
         <FaSquareCheck className={`text-3xl opacity-40 ${getVerdictColor(result.overall_verdict)}`} />
         <div className="flex flex-col gap-0.5 min-w-0">
@@ -92,15 +93,24 @@ export default function ClaimCard({ claim }: { claim: ResultEntry }) {
   );
 }
 
+function ChatIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
 type ClaimCardModalProps = {
   result: NonNullable<ResultEntry["result"]>;
   id: string;
   refProp: RefObject<HTMLDivElement | null>;
   onClose?: () => void;
+  onChatAbout?: () => void;
 };
 
 /** Expanded modal view for a single fact-check result. */
-export function ClaimCardModal({ result, id, refProp, onClose }: ClaimCardModalProps) {
+export function ClaimCardModal({ result, id, refProp, onClose, onChatAbout }: ClaimCardModalProps) {
   return (
     <div className="fixed inset-0 grid place-items-center z-[100] px-4">
       <motion.div
@@ -113,13 +123,25 @@ export function ClaimCardModal({ result, id, refProp, onClose }: ClaimCardModalP
           <div>
             <VerdictBadge verdict={result.overall_verdict.replaceAll("_", " ")} />
           </div>
-          {onClose && 
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-black transition-colors"
-          >
-            <CloseIcon />
-          </button>}
+          <div className="flex items-center gap-3">
+            {onChatAbout && (
+              <button
+                onClick={onChatAbout}
+                className="text-xs text-gray-400 hover:text-[#7c2353] transition-colors flex items-center gap-1"
+              >
+                <ChatIcon />
+                Chat about this
+              </button>
+            )}
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="text-gray-400 hover:text-black transition-colors"
+              >
+                <CloseIcon />
+              </button>
+            )}
+          </div>
         </div>
         <ClaimCardContent result={result} />
       </motion.div>
@@ -146,12 +168,12 @@ export function ClaimCardContent({ result, defaultExpanded = 0, inline = false }
   return (
     <>
       {/* Summary */}
-      <div className="px-4 pt-3 pb-1">
+      <div className="px-4 pt-3 pb-2">
         <p className="text-sm text-gray-700">{result.summary}</p>
       </div>
 
       {/* Claims accordion */}
-      <div className={`px-4 pb-4 flex flex-col gap-3 mt-3${inline ? "" : " modal-claims-scroll overflow-y-auto"}`}>
+      <div className={`px-4 pb-4 flex flex-col gap-3 mt-2 ${inline ? "" : " modal-claims-scroll overflow-y-auto"}`}>
         {result.claims.map((claim, i) => (
           <div
             key={i}

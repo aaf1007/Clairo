@@ -90,7 +90,7 @@ class FactCheckRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=20000, description="Highlighted text to fact-check")
     url: str | None = Field(None, description="Source page URL for context")
     context: str | None = Field(None, max_length=5000, description="Surrounding paragraph text")
-    model: str = Field("gemini-2.5-flash", description="Gemini model to use")
+    model: str = Field("gemini-2.5-flash-lite", description="Gemini model to use")
 
 
 class ExtractedClaim(BaseModel):
@@ -197,3 +197,34 @@ class TranscribeResponse(BaseModel):
     text: str
     language: str | None = None
     duration_seconds: float | None = None
+
+
+# ──────────────────────────────────────────────
+# Chat
+# ──────────────────────────────────────────────
+
+class ChatRole(str, Enum):
+    """The sender of a chat message."""
+    USER = "user"
+    ASSISTANT = "assistant"
+
+
+class ChatMessage(BaseModel):
+    """A single message in the chat conversation history."""
+    role: ChatRole
+    content: str
+
+
+class ChatRequest(BaseModel):
+    """The JSON body sent by the extension to POST /api/chatbot.
+
+    Attributes:
+        messages: Full conversation history. Must have at least 1 message.
+            Capped at 20 messages server-side to prevent context overflow.
+            The last message is always the new user message.
+        context: Optional serialized JSON of the selected FactCheckResponse.
+            When provided, the bot answers questions about that specific result.
+            Omit for free-form chat without fact-check context.
+    """
+    messages: list[ChatMessage] = Field(..., min_length=1, max_length=20)
+    context: str | None = Field(None, max_length=50000)

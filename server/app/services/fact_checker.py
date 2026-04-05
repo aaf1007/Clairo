@@ -13,6 +13,7 @@ from app.models.schemas import ClaimAnalysis, Verdict
 # the app/ directory, then into prompts/. read_text() returns the file contents as a string.
 _PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "fact_verification.md"
 SYSTEM_PROMPT = _PROMPT_PATH.read_text()
+GEMINI_MODEL = "gemini-2.5-flash-lite"
 
 
 async def verify_claim(client: genai.Client, claim: str) -> ClaimAnalysis:
@@ -50,7 +51,7 @@ async def verify_claim(client: genai.Client, claim: str) -> ClaimAnalysis:
     for attempt in range(2):
         try:
             response = await client.aio.models.generate_content(
-                model="gemini-2.5-flash",
+                model=GEMINI_MODEL,
                 contents=f"Fact-check this claim: {claim}",
                 config=types.GenerateContentConfig(
                     system_instruction=SYSTEM_PROMPT,

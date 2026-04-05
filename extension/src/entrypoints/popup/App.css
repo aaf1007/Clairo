@@ -51,6 +51,76 @@ body::-webkit-scrollbar {
   background: rgba(0, 0, 0, 0.2);
 }
 
+/* Chat scrollbar */
+.chat-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.2s ease;
+}
+
+.chat-scroll:hover {
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+.chat-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.chat-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 9999px;
+}
+
+.chat-scroll:hover::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Streaming cursor blink */
+.streaming-cursor::after {
+  content: "▊";
+  font-size: 0.75em;
+  animation: blink 0.7s step-end infinite;
+  color: #7c2353;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+/* Markdown content in chat bubbles */
+.chat-markdown p {
+  margin: 0 0 0.4em 0;
+}
+
+.chat-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.chat-markdown ul,
+.chat-markdown ol {
+  margin: 0.25em 0 0.4em 1.25em;
+  padding: 0;
+}
+
+.chat-markdown li {
+  margin-bottom: 0.15em;
+}
+
+.chat-markdown strong {
+  font-weight: 600;
+}
+
+.chat-markdown code {
+  font-size: 0.8em;
+  background: rgba(0, 0, 0, 0.06);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+
 .heading {
   background: #1C0411;
 background: -webkit-linear-gradient(90deg, rgba(28, 4, 17, 1) 29%, rgba(124, 35, 83, 1) 56%, rgba(197, 95, 89, 1) 81%, rgba(210, 105, 116, 1) 100%);

@@ -9,7 +9,7 @@ export default defineConfig({
   }),
   srcDir: "src",
   manifest: {
-    permissions: ["contextMenus", "storage"],
+    permissions: ["contextMenus", "storage", "sidePanel"],
     icons: {
       "16": "/verifai/16.png",
       "32": "/verifai/32.png",
