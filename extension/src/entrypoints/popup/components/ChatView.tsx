@@ -46,9 +46,9 @@ export default function ChatView({ results, initialContextIndex, onContextIndexC
   }, [initialContextIndex]);
 
   // Auto-scroll to bottom when messages update
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  // useEffect(() => {
+  //   bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  // }, [messages]);
 
   // Abort stream on unmount
   useEffect(() => {
@@ -213,7 +213,7 @@ export default function ChatView({ results, initialContextIndex, onContextIndexC
   const suggestions = contextIndex !== null ? CONTEXT_SUGGESTIONS : FREE_SUGGESTIONS;
 
   return (
-    <div className="flex flex-col h-full gap-2">
+    <div className="flex flex-col flex-1 min-h-0 gap-2">
       {/* Context selector bar */}
       <div className="flex items-center gap-2 shrink-0">
         <select

@@ -7,7 +7,7 @@
 
 body {
   width: 440px;
-  min-height: 720px;
+  height: 600px;
   font-size: 16px;
   overflow: hidden;
   scrollbar-width: none;
