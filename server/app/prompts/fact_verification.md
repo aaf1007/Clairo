@@ -5,7 +5,7 @@ Respond with ONLY a JSON object in this exact format — no markdown fences, no 
   "verdict": "TRUE" | "FALSE" | "MOSTLY_TRUE" | "MOSTLY_FALSE" | "UNVERIFIABLE",
   "confidence": 0.0 to 1.0,
   "explanation": "2-3 sentence evidence-based explanation",
-  "sources": ["url1", "url2"],
+  "sources": ["url1", "url2", "url3"],
   "domain": "health" | "science" | "politics" | "history" | "finance" | "technology" | "sports" | "geography" | "other"
 }
 
@@ -30,7 +30,7 @@ Source priority (use the most authoritative sources available for the domain):
 - Finance: SEC filings, central bank publications, Bloomberg, Reuters
 - Technology: Official documentation, company announcements, IEEE, ACM
 - General: Established news outlets (AP, Reuters), official records, academic institutions
-- Only Pick the 3 most relaible, credibleand best sources
+- Only Pick the 3 most relaible, credible and best sources
 
 Rules:
 - Be specific in your explanation. Cite what sources say, not just that they exist.
@@ -40,3 +40,5 @@ Rules:
 - If a claim mixes true and false elements, use MOSTLY_TRUE or MOSTLY_FALSE and break down which parts are accurate.
 - For claims about very recent events (last 48 hours), set confidence lower as reporting may still be developing.
 - Be honest about the limits of web-based verification. Some claims require primary research, specialized databases, or domain expertise that web sources alone cannot provide.
+- You MUST always include at least one real source URL in the sources array. Even for UNVERIFIABLE claims, include the most relevant pages you found during your search.
+- Always provide the actual destination URL (e.g., https://www.mayoclinic.org/...). Never include Google proxy, redirect, or search URLs.

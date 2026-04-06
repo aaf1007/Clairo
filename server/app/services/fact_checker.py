@@ -2,6 +2,7 @@ import asyncio
 import json
 from pathlib import Path
 
+import httpx
 from google import genai
 from google.genai import types
 
@@ -14,6 +15,18 @@ from app.models.schemas import ClaimAnalysis, Verdict
 _PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "fact_verification.md"
 SYSTEM_PROMPT = _PROMPT_PATH.read_text()
 GEMINI_MODEL = "gemini-2.5-flash-lite"
+
+
+async def _resolve_source_url(url: str) -> str:
+    """Follow redirects on Vertex AI Search proxy URLs to get the real source URL."""
+    if "vertexaisearch.cloud.google" not in url:
+        return url
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=5) as client:
+            resp = await client.head(url)
+            return str(resp.url)
+    except Exception:
+        return url
 
 
 async def verify_claim(client: genai.Client, claim: str) -> ClaimAnalysis:
@@ -87,10 +100,12 @@ async def verify_claim(client: genai.Client, claim: str) -> ClaimAnalysis:
     # grounding_metadata.grounding_chunks is a list of search result objects.
     # Each chunk has a .web attribute with a .uri (the URL) and .title.
     # We only keep chunks that have a .web attribute (some may be other types).
+    # Proxy URLs (vertexaisearch.cloud.google) are resolved to their real destinations.
     grounding = response.candidates[0].grounding_metadata
     sources = []
     if grounding and grounding.grounding_chunks:
-        sources = [chunk.web.uri for chunk in grounding.grounding_chunks if chunk.web]
+        raw_urls = [chunk.web.uri for chunk in grounding.grounding_chunks if chunk.web]
+        sources = list(await asyncio.gather(*[_resolve_source_url(url) for url in raw_urls]))
 
     # LLMs sometimes wrap JSON in markdown code fences like ```json ... ```.
     # We detect this and slice out just the JSON object between { and }.
@@ -122,13 +137,21 @@ async def verify_claim(client: genai.Client, claim: str) -> ClaimAnalysis:
     raw_verdict = result.get("verdict", "UNVERIFIABLE").upper()
     verdict = Verdict(raw_verdict) if raw_verdict in valid_verdicts else Verdict.UNVERIFIABLE
 
+    # If grounding metadata had no sources, fall back to the model's cited sources.
+    if not sources:
+        sources = result.get("sources", [])
+
+    print(f"Sources count: {len(sources)}")
+    for i, source in enumerate(sources):
+        print(f"Claim analysis source[{i}]: {source}")
+
     return ClaimAnalysis(
         statement=claim,
         verdict=verdict,
         # .get() with a default prevents KeyError if the model omits a field.
         confidence=float(result.get("confidence", 0.5)),
         explanation=result.get("explanation", ""),
-        sources=sources,  # From grounding metadata, not the model's text.
+        sources=sources[:3],
         domain=result.get("domain", "other"),
     )
 
