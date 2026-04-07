@@ -24,6 +24,89 @@ type ClaimAnalysis = {
   checkability: string;
 };
 
+// Handles Fact Checking requests to the backend
+async function runFactCheck(text: string, url?: string) {
+  const factCheckRequest: FactCheckRequest = { text, url };
+
+  const stored = await browser.storage.local.get("verifaiResults");
+  const existing: any[] = (stored.verifaiResults as any[]) ?? [];
+
+  await browser.storage.local.set({
+    verifaiResults: [...existing, { status: "loading", result: null }],
+  });
+
+  await browser.action.openPopup();
+
+  try {
+    const response = await fetch("http://localhost:8000/api/fact-check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(factCheckRequest),
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      await browser.storage.local.set({
+        verifaiResults: [...existing, { status: "error", message: err.detail }],
+      });
+      return;
+    }
+
+    const factCheckResponse: FactCheckResponse = await response.json();
+
+    await browser.storage.local.set({
+      verifaiResults: [...existing, { status: "done", result: factCheckResponse }],
+    });
+  } catch (err) {
+    await browser.storage.local.set({
+      verifaiResults: [...existing, { status: "error", message: "Could not reach server" }],
+    });
+  }
+}
+
+async function handleVideoVerify(videoBase64: string, url: string, contentType: string) {
+  const stored = await browser.storage.local.get("verifaiResults");
+  const existing: any[] = (stored.verifaiResults as any[]) ?? [];
+
+  await browser.storage.local.set({
+    verifaiResults: [...existing, { status: "loading", result: null }],
+  });
+
+  await browser.action.openPopup();
+
+  try {
+    const binary = atob(videoBase64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const blob = new Blob([bytes], { type: contentType });
+    const formData = new FormData();
+    formData.append("file", blob, "tiktok-video.mp4");
+
+    const response = await fetch(`http://localhost:8000/api/transcribe-and-check?url=${encodeURIComponent(url)}`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      await browser.storage.local.set({
+        verifaiResults: [...existing, { status: "error", message: err.detail ?? "Transcription failed" }],
+      });
+      return;
+    }
+
+    const factCheckResponse: FactCheckResponse = await response.json();
+    await browser.storage.local.set({
+      verifaiResults: [...existing, { status: "done", result: factCheckResponse }],
+    });
+  } catch (err) {
+    await browser.storage.local.set({
+      verifaiResults: [...existing, { status: "error", message: "Could not reach server" }],
+    });
+  }
+}
+
+
 export default defineBackground(() => {
   console.log("Hello background!", { id: browser.runtime.id });
 
@@ -54,71 +137,26 @@ export default defineBackground(() => {
   browser.contextMenus.onClicked.addListener(async (info, tab) => {
     if (info.menuItemId !== "verifai-check") return;
 
-    // Selected text
     const selectedText = info.selectionText;
     if (!selectedText) return;
 
-    // Build Request Object
-    const factCheckRequest: FactCheckRequest = {
-      text: selectedText,
-      url: tab?.url,
-    };
+    await runFactCheck(selectedText, tab?.url);
+  });
 
-    const stored = await browser.storage.local.get("verifaiResults");
-    const existing: any[] = (stored.verifaiResults as any[]) ?? [];
-
-    // Store loading state immediately, then open the popup.
-    // Order matters: write storage first so the popup already sees "loading"
-    // when it mounts, rather than flashing an empty state.
-    await browser.storage.local.set({
-      verifaiResults: [...existing, { status: "loading", result: null }],
-    });
-
-    // openPopup() must be called in the same event tick as the user gesture
-    // (the context menu click). Awaiting storage.set above is fast (local I/O)
-    // so Chrome still considers this the same gesture context.
-    await browser.action.openPopup();
-
-    try {
-      // API Call
-      const response = await fetch("http://localhost:8000/api/fact-check", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(factCheckRequest),
-      });
-
-      if (!response.ok) {
-        const err = await response.json();
-        await browser.storage.local.set({
-          verifaiResults: [
-            ...existing,
-            { status: "error", message: err.detail },
-          ],
-        });
-        return;
-      }
-
-      // Response Object
-      const factCheckResponse: FactCheckResponse = await response.json();
-
-      // Store results after response from backend
-      await browser.storage.local.set({
-        verifaiResults: [
-          ...existing,
-          { status: "done", result: factCheckResponse },
-        ],
-      });
-    } catch (err) {
-      await browser.storage.local.set({
-        verifaiResults: [
-          ...existing,
-          { status: "error", message: "Could not reach server" },
-        ],
-      });
+  
+  browser.runtime.onMessage.addListener((msg) => {
+    if (msg.type === "TIKTOK_VERIFY") {
+      runFactCheck(msg.text, msg.url);
     }
   });
 
-  // TODO do this when integrating automatic sidebar panel open on user verify event
+  browser.runtime.onMessage.addListener((msg) => {
+    if (msg.type === "TIKTOK_VIDEO_VERIFY") {
+      handleVideoVerify(msg.videoBase64 as string, msg.url as string, msg.contentType as string);
+    }
+  });
+
+  // TODO: do this when integrating automatic sidebar panel open on user verify event
   browser.runtime.onMessage.addListener((msg, sender) => {
     if (msg.action === "openSideBar") {
       // Guard for tab being undefined

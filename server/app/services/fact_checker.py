@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 from pathlib import Path
 
 import httpx
@@ -15,6 +16,100 @@ from app.models.schemas import ClaimAnalysis, Verdict
 _PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "fact_verification.md"
 SYSTEM_PROMPT = _PROMPT_PATH.read_text()
 GEMINI_MODEL = "gemini-2.5-flash-lite"
+
+_VERDICT_SCHEMA = types.Schema(
+    type=types.Type.OBJECT,
+    properties={
+        "verdict": types.Schema(type=types.Type.STRING, enum=["TRUE", "FALSE", "MOSTLY_TRUE", "MOSTLY_FALSE", "UNVERIFIABLE"]),
+        "confidence": types.Schema(type=types.Type.NUMBER),
+        "explanation": types.Schema(type=types.Type.STRING),
+        "sources": types.Schema(type=types.Type.ARRAY, items=types.Schema(type=types.Type.STRING)),
+        "domain": types.Schema(type=types.Type.STRING, enum=["health", "science", "politics", "history", "finance", "technology", "sports", "geography", "other"]),
+    },
+    required=["verdict", "confidence", "explanation", "domain"],
+)
+
+
+def _extract_json_from_response(content: str) -> dict | None:
+    """Try multiple strategies to extract a JSON dict from a Gemini response.
+
+    When Search Grounding is active Gemini may wrap the JSON in prose or
+    markdown fences. This function tries progressively looser strategies so
+    we only fall back to a second API call as a last resort.
+    """
+    # Strategy 1: direct parse (response is pure JSON)
+    try:
+        return json.loads(content.strip())
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # Strategy 2: markdown code fence  ```json ... ``` or ``` ... ```
+    fence_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", content, re.DOTALL)
+    if fence_match:
+        try:
+            return json.loads(fence_match.group(1))
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    # Strategy 3: brace slicing — grab everything between first { and last }
+    first_brace = content.find("{")
+    last_brace = content.rfind("}")
+    if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+        try:
+            return json.loads(content[first_brace:last_brace + 1])
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    # Strategy 4: regex field extraction from natural language
+    verdict_match = re.search(
+        r'(?:verdict|ruling|assessment)["\s:*]+\**\s*(TRUE|FALSE|MOSTLY_TRUE|MOSTLY_FALSE|UNVERIFIABLE)\**',
+        content, re.IGNORECASE,
+    )
+    confidence_match = re.search(r'(?:confidence)["\s:]+(\d+\.?\d*)', content, re.IGNORECASE)
+    domain_match = re.search(
+        r'(?:domain)["\s:*]+\**\s*(health|science|politics|history|finance|technology|sports|geography|other)\**',
+        content, re.IGNORECASE,
+    )
+    if verdict_match:
+        # Best-effort explanation: grab first substantive paragraph
+        paragraphs = [p.strip() for p in content.split("\n") if len(p.strip()) > 60]
+        explanation = paragraphs[0] if paragraphs else content[:200].strip()
+        return {
+            "verdict": verdict_match.group(1).upper(),
+            "confidence": float(confidence_match.group(1)) if confidence_match else 0.5,
+            "explanation": explanation,
+            "sources": [],
+            "domain": domain_match.group(1).lower() if domain_match else "other",
+        }
+
+    return None
+
+
+async def _reformat_with_gemini(client: genai.Client, raw_text: str, claim: str) -> dict | None:
+    """Last-resort: ask Gemini (no grounding, forced JSON) to reformat raw_text.
+
+    Only called when all local extraction strategies fail. Uses
+    response_mime_type + response_schema for guaranteed JSON output.
+    """
+    prompt = (
+        f"A fact-check was performed for this claim: {claim}\n\n"
+        f"The raw research response was:\n{raw_text}\n\n"
+        "Extract and return the fact-check verdict as structured JSON."
+    )
+    try:
+        response = await client.aio.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=_VERDICT_SCHEMA,
+                temperature=0.0,
+            ),
+        )
+        return json.loads(response.text)
+    except Exception as e:
+        print(f"Reformat fallback failed: {e}")
+        return None
 
 
 async def _resolve_source_url(url: str) -> str:
@@ -76,7 +171,6 @@ async def verify_claim(client: genai.Client, claim: str) -> ClaimAnalysis:
         except Exception as e:
             if "429" in str(e) and attempt == 0:
                 # Extract suggested retry delay from the error, default to 10s
-                import re
                 match = re.search(r"retry[^\d]*(\d+(?:\.\d+)?)", str(e), re.IGNORECASE)
                 delay = float(match.group(1)) + 1 if match else 10
                 print(f"Gemini rate limited, retrying in {delay}s...")
@@ -107,20 +201,19 @@ async def verify_claim(client: genai.Client, claim: str) -> ClaimAnalysis:
         raw_urls = [chunk.web.uri for chunk in grounding.grounding_chunks if chunk.web]
         sources = list(await asyncio.gather(*[_resolve_source_url(url) for url in raw_urls]))
 
-    # LLMs sometimes wrap JSON in markdown code fences like ```json ... ```.
-    # We detect this and slice out just the JSON object between { and }.
-    first_brace = content.find("{")
-    last_brace = content.rfind("}")
-    if first_brace != -1 and last_brace != -1:
-        cleaned = content[first_brace:last_brace + 1]
-    else:
-        cleaned = content.strip()
+    # Try multi-strategy JSON extraction from the model's text response.
+    # When Search Grounding is active Gemini often wraps JSON in prose or
+    # markdown — _extract_json_from_response handles that gracefully.
+    print(f"Raw Gemini response for '{claim[:50]}': {content[:300]}")
+    result = _extract_json_from_response(content)
 
-    # Parse the JSON. If the model returned something unparseable, we degrade
-    # gracefully to UNVERIFIABLE rather than crashing the whole request.
-    try:
-        result = json.loads(cleaned)
-    except json.JSONDecodeError:
+    if result is None:
+        # All local strategies failed — make a second (non-grounded) call to
+        # reformat the raw text into guaranteed JSON.
+        print(f"Local JSON extraction failed for '{claim[:50]}', attempting reformat...")
+        result = await _reformat_with_gemini(client, content, claim)
+
+    if result is None:
         return ClaimAnalysis(
             statement=claim,
             verdict=Verdict.UNVERIFIABLE,

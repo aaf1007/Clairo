@@ -174,9 +174,12 @@ class FactCheckResponse(BaseModel):
     source_url: str | None = None
 
 
-# ──────────────────────────────────────────────
-# Transcription
-# ──────────────────────────────────────────────
+class TranscriptionSegment(BaseModel):
+    """A single timestamped segment from Whisper's verbose_json output."""
+    start: float
+    end: float
+    text: str
+
 
 class TranscribeResponse(BaseModel):
     """The JSON response returned by POST /api/transcribe.
@@ -193,10 +196,12 @@ class TranscribeResponse(BaseModel):
         language: The detected language code, e.g. "en". None if not detected.
         duration_seconds: The length of the audio clip in seconds. None if
             not returned by the Whisper API.
+        segments: Timestamped segments from Whisper verbose_json output.
     """
     text: str
     language: str | None = None
     duration_seconds: float | None = None
+    segments: list[TranscriptionSegment] = Field(default_factory=list)
 
 
 # ──────────────────────────────────────────────

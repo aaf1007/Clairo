@@ -10,6 +10,13 @@ export default defineConfig({
   srcDir: "src",
   manifest: {
     permissions: ["contextMenus", "storage", "sidePanel"],
+    host_permissions: ["http://localhost:8000/*"],
+    web_accessible_resources: [
+      {
+        resources: ["/verifai/*"],
+        matches: ["*://*.tiktok.com/*"],
+      },
+    ],
     icons: {
       "16": "/verifai/16.png",
       "32": "/verifai/32.png",

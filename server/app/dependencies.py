@@ -39,7 +39,6 @@ async def get_groq_client() -> httpx.AsyncClient:
             headers={
                 # Bearer token auth — Groq expects this on every request.
                 "Authorization": f"Bearer {os.getenv('GROQ_API_KEY')}",
-                "Content-Type": "application/json",
             },
             timeout=15.0,  # Raise httpx.TimeoutException if no response in 15s.
         )
