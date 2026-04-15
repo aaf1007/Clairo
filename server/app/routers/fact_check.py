@@ -7,7 +7,7 @@ from google import genai
 
 from app.dependencies import get_gemini_client, get_groq_client
 from app.models.schemas import FactCheckRequest, FactCheckResponse, Verdict
-from app.services.claim_extractor import extract_claims
+from app.services.claim_extractor import ClaimExtractionError, extract_claims
 from app.services.fact_checker import verify_claims
 from app.services.text_cleaner import clean_text
 
@@ -74,6 +74,8 @@ async def fact_check(
     except httpx.HTTPStatusError as e:
         # Groq responded with a 4xx or 5xx error (e.g. invalid API key → 401).
         raise HTTPException(status_code=502, detail=f"Groq API error: {e.response.status_code}")
+    except ClaimExtractionError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Claim extraction failed: {str(e)}")
 

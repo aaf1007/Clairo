@@ -15,7 +15,7 @@ from app.models.schemas import ClaimAnalysis, Verdict
 # the app/ directory, then into prompts/. read_text() returns the file contents as a string.
 _PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "fact_verification.md"
 SYSTEM_PROMPT = _PROMPT_PATH.read_text()
-GEMINI_MODEL = "gemini-2.5-flash-lite"
+GEMINI_MODEL = "gemini-2.5-flash"
 
 _VERDICT_SCHEMA = types.Schema(
     type=types.Type.OBJECT,
@@ -28,6 +28,18 @@ _VERDICT_SCHEMA = types.Schema(
     },
     required=["verdict", "confidence", "explanation", "domain"],
 )
+
+
+def _unverifiable_analysis(claim: str, explanation: str, *, sources: list[str] | None = None) -> ClaimAnalysis:
+    """Build a consistent degraded response when Gemini returns unusable data."""
+    return ClaimAnalysis(
+        statement=claim,
+        verdict=Verdict.UNVERIFIABLE,
+        confidence=0.0,
+        explanation=explanation,
+        sources=sources or [],
+        domain="other",
+    )
 
 
 def _extract_json_from_response(content: str) -> dict | None:
@@ -85,6 +97,44 @@ def _extract_json_from_response(content: str) -> dict | None:
     return None
 
 
+def _extract_response_text(response) -> str:
+    """Return Gemini text from either response.text or candidate content parts."""
+    text = getattr(response, "text", None)
+    if isinstance(text, str) and text.strip():
+        return text.strip()
+
+    candidates = getattr(response, "candidates", None) or []
+    if not candidates:
+        return ""
+
+    content = getattr(candidates[0], "content", None)
+    parts = getattr(content, "parts", None) or []
+    texts = []
+    for part in parts:
+        part_text = getattr(part, "text", None)
+        if isinstance(part_text, str) and part_text.strip():
+            texts.append(part_text.strip())
+    return "\n".join(texts)
+
+
+def _extract_grounding_urls(response) -> list[str]:
+    """Safely extract grounded source URLs from the first Gemini candidate."""
+    candidates = getattr(response, "candidates", None) or []
+    if not candidates:
+        return []
+
+    grounding = getattr(candidates[0], "grounding_metadata", None)
+    grounding_chunks = getattr(grounding, "grounding_chunks", None) or []
+
+    urls = []
+    for chunk in grounding_chunks:
+        web = getattr(chunk, "web", None)
+        uri = getattr(web, "uri", None)
+        if isinstance(uri, str) and uri:
+            urls.append(uri)
+    return urls
+
+
 async def _reformat_with_gemini(client: genai.Client, raw_text: str, claim: str) -> dict | None:
     """Last-resort: ask Gemini (no grounding, forced JSON) to reformat raw_text.
 
@@ -106,7 +156,10 @@ async def _reformat_with_gemini(client: genai.Client, raw_text: str, claim: str)
                 temperature=0.0,
             ),
         )
-        return json.loads(response.text)
+        response_text = _extract_response_text(response)
+        if not response_text:
+            return None
+        return json.loads(response_text)
     except Exception as e:
         print(f"Reformat fallback failed: {e}")
         return None
@@ -156,6 +209,9 @@ async def verify_claim(client: genai.Client, claim: str) -> ClaimAnalysis:
     """
     # Retry once on 429 rate-limit errors using the suggested retry delay.
     # This handles per-minute quota hits gracefully without crashing the request.
+    
+    response = None # response assigned with initial value
+
     for attempt in range(2):
         try:
             response = await client.aio.models.generate_content(
@@ -178,28 +234,29 @@ async def verify_claim(client: genai.Client, claim: str) -> ClaimAnalysis:
             else:
                 # Daily quota exhausted or non-retryable error — degrade gracefully
                 print(f"Gemini failed for claim '{claim[:50]}': {e}")
-                return ClaimAnalysis(
-                    statement=claim,
-                    verdict=Verdict.UNVERIFIABLE,
-                    confidence=0.0,
-                    explanation="Verification unavailable (API quota exceeded).",
-                    sources=[],
-                    domain="other",
+                return _unverifiable_analysis(
+                    claim,
+                    "Verification unavailable (API quota exceeded).",
                 )
 
-    # response.text is the raw text the model generated (our verdict JSON).
-    content = response.text
+    print(f"response before _extract_response_text: {response}")
 
-    # Extract source URLs from grounding metadata.
-    # grounding_metadata.grounding_chunks is a list of search result objects.
-    # Each chunk has a .web attribute with a .uri (the URL) and .title.
-    # We only keep chunks that have a .web attribute (some may be other types).
-    # Proxy URLs (vertexaisearch.cloud.google) are resolved to their real destinations.
-    grounding = response.candidates[0].grounding_metadata
+    # Gemini occasionally returns partial responses with missing text or
+    # candidates (for example blocked or empty outputs). Treat those as a
+    # degraded verification result instead of crashing the whole request.
+    content = _extract_response_text(response)
+
     sources = []
-    if grounding and grounding.grounding_chunks:
-        raw_urls = [chunk.web.uri for chunk in grounding.grounding_chunks if chunk.web]
+    raw_urls = _extract_grounding_urls(response)
+    if raw_urls:
         sources = list(await asyncio.gather(*[_resolve_source_url(url) for url in raw_urls]))
+
+    if not content:
+        return _unverifiable_analysis(
+            claim,
+            "Gemini returned no usable verification result.",
+            sources=sources,
+        )
 
     # Try multi-strategy JSON extraction from the model's text response.
     # When Search Grounding is active Gemini often wraps JSON in prose or
@@ -214,38 +271,42 @@ async def verify_claim(client: genai.Client, claim: str) -> ClaimAnalysis:
         result = await _reformat_with_gemini(client, content, claim)
 
     if result is None:
-        return ClaimAnalysis(
-            statement=claim,
-            verdict=Verdict.UNVERIFIABLE,
-            confidence=0.0,
-            explanation="Failed to parse verification response.",
+        return _unverifiable_analysis(
+            claim,
+            "Failed to parse verification response.",
             sources=sources,
-            domain="other",
         )
 
     # Validate the verdict string. The model might return something unexpected
     # (e.g. "UNCERTAIN"), so we check against our known enum values and fall
     # back to UNVERIFIABLE if it doesn't match.
     valid_verdicts = {v.value for v in Verdict}
-    raw_verdict = result.get("verdict", "UNVERIFIABLE").upper()
+    raw_verdict = str(result.get("verdict", "UNVERIFIABLE")).upper()
     verdict = Verdict(raw_verdict) if raw_verdict in valid_verdicts else Verdict.UNVERIFIABLE
 
     # If grounding metadata had no sources, fall back to the model's cited sources.
     if not sources:
-        sources = result.get("sources", [])
+        result_sources = result.get("sources", [])
+        if isinstance(result_sources, list):
+            sources = [source for source in result_sources if isinstance(source, str)]
 
     print(f"Sources count: {len(sources)}")
     for i, source in enumerate(sources):
         print(f"Claim analysis source[{i}]: {source}")
 
+    try:
+        confidence = float(result.get("confidence", 0.5))
+    except (TypeError, ValueError):
+        confidence = 0.5
+
     return ClaimAnalysis(
         statement=claim,
         verdict=verdict,
         # .get() with a default prevents KeyError if the model omits a field.
-        confidence=float(result.get("confidence", 0.5)),
-        explanation=result.get("explanation", ""),
+        confidence=confidence,
+        explanation=str(result.get("explanation") or ""),
         sources=sources[:3],
-        domain=result.get("domain", "other"),
+        domain=str(result.get("domain") or "other"),
     )
 
 

@@ -5,12 +5,17 @@ import httpx
 
 from app.models.schemas import Checkability, ExtractedClaim
 
+
+class ClaimExtractionError(Exception):
+    """Raised when Groq returns no usable claims (e.g. bad JSON shape or empty list)."""
+
+
 # Load system prompt from file
 _PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "claim_extraction.md"
 SYSTEM_PROMPT = _PROMPT_PATH.read_text()
 
 # Model to use on Groq
-MODEL = "llama-3.3-70b-versatile"
+MODEL = "llama-3.1-8b-instant"
 
 
 async def extract_claims(client: httpx.AsyncClient, text: str, context: str | None = None) -> list[ExtractedClaim]:
@@ -58,7 +63,7 @@ async def extract_claims(client: httpx.AsyncClient, text: str, context: str | No
     except json.JSONDecodeError:
         return []
 
-    return [
+    ret = [
         ExtractedClaim(
             claim=item["claim"],
             checkability=Checkability(item.get("checkability", "medium")),
@@ -66,4 +71,11 @@ async def extract_claims(client: httpx.AsyncClient, text: str, context: str | No
         for item in raw
         if "claim" in item
     ]
+
+    if not ret:
+        raise ClaimExtractionError(
+            "No extractable claims from the Groq model response. Try different text or check the extraction prompt."
+        )
+
+    return ret
 
