@@ -1,14 +1,30 @@
 @import "tailwindcss";
-@import "@heroui/styles"; 
+@import "@heroui/styles";
 
 html, body {
   margin: 0;
+  min-height: 100vh;
   overflow: hidden;
   scrollbar-width: none;
+  background: white;
+}
+
+body[data-surface="popup"] {
+  width: 440px;
+  height: 600px;
+  background: white;
+}
+
+body[data-surface="sidepanel"] {
+  width: 100%;
+  min-width: 320px;
+  height: 100vh;
+  background: white;
 }
 
 #root {
   height: 100%;
+  min-height: 100vh;
 }
 
 html::-webkit-scrollbar,
@@ -23,7 +39,7 @@ body::-webkit-scrollbar {
 
   color-scheme: light;
   color: #213547;
-  background-color: #f6f7f9;
+  background-color: white;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;

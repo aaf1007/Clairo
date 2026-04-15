@@ -5,9 +5,17 @@ import { AnimatePresence, motion } from "motion/react";
 import { RefObject, useEffect, useId, useRef, useState } from "react";
 import { FaSquareCheck } from "react-icons/fa6";
 import type { FactCheckResponse } from "../../background";
-import { ResultEntry } from "../App";
+import type { ResultEntry, Surface } from "../App";
 
-export default function ClaimCard({ claim, onChatAbout }: { claim: ResultEntry; onChatAbout?: () => void }) {
+export default function ClaimCard({
+  claim,
+  surface = "popup",
+  onChatAbout,
+}: {
+  claim: ResultEntry;
+  surface?: Surface;
+  onChatAbout?: () => void;
+}) {
   const [active, setActive] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const id = useId();
@@ -64,6 +72,7 @@ export default function ClaimCard({ claim, onChatAbout }: { claim: ResultEntry; 
           <ClaimCardModal
             result={result}
             id={id}
+            surface={surface}
             refProp={ref}
             onClose={() => setActive(false)}
             onChatAbout={onChatAbout ? () => { setActive(false); onChatAbout(); } : undefined}
@@ -104,19 +113,22 @@ function ChatIcon() {
 type ClaimCardModalProps = {
   result: NonNullable<ResultEntry["result"]>;
   id: string;
+  surface: Surface;
   refProp: RefObject<HTMLDivElement | null>;
   onClose?: () => void;
   onChatAbout?: () => void;
 };
 
 /** Expanded modal view for a single fact-check result. */
-export function ClaimCardModal({ result, id, refProp, onClose, onChatAbout }: ClaimCardModalProps) {
+export function ClaimCardModal({ result, id, surface, refProp, onClose, onChatAbout }: ClaimCardModalProps) {
   return (
     <div className="fixed inset-0 grid place-items-center z-[100] px-4">
       <motion.div
         layoutId={`card-${id}`}
         ref={refProp}
-        className="w-full max-w-[400px] max-h-[80vh] flex flex-col bg-white rounded-2xl overflow-hidden shadow-xl"
+        className={`w-full max-h-[80vh] flex flex-col overflow-hidden rounded-2xl bg-white shadow-xl ${
+          surface === "sidepanel" ? "max-w-[720px]" : "max-w-[400px]"
+        }`}
       >
         {/* Header */}
         <div className="flex justify-between items-start p-4 border-b border-gray-100">
@@ -143,7 +155,7 @@ export function ClaimCardModal({ result, id, refProp, onClose, onChatAbout }: Cl
             )}
           </div>
         </div>
-        <ClaimCardContent result={result} />
+        <ClaimCardContent result={result} surface={surface} />
       </motion.div>
     </div>
   );
@@ -155,10 +167,16 @@ type ClaimCardContentProps = {
   defaultExpanded?: number;
   /** When true, disables the inner scroll so a parent container can handle scrolling. */
   inline?: boolean;
+  surface?: Surface;
 };
 
 /** Shared inner body: summary + accordion claims list. */
-export function ClaimCardContent({ result, defaultExpanded = 0, inline = false }: ClaimCardContentProps) {
+export function ClaimCardContent({
+  result,
+  defaultExpanded = 0,
+  inline = false,
+  surface = "popup",
+}: ClaimCardContentProps) {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(defaultExpanded);
 
   /** Toggles accordion: collapses if already open, expands otherwise. */
@@ -181,7 +199,7 @@ export function ClaimCardContent({ result, defaultExpanded = 0, inline = false }
             onClick={() => handleToggleClaim(i)}
           >
             <div className="flex items-start justify-between gap-2 mb-1">
-              <p className="text-xs font-medium text-gray-800 leading-snug">
+              <p className={`font-medium text-gray-800 leading-snug ${surface === "sidepanel" ? "text-sm" : "text-xs"}`}>
                 {claim.statement}
               </p>
               <VerdictBadge verdict={claim.verdict.replaceAll("_", " ")} small />
@@ -195,7 +213,9 @@ export function ClaimCardContent({ result, defaultExpanded = 0, inline = false }
                   transition={{ duration: 0.2 }}
                   className="overflow-hidden"
                 >
-                  <p className="text-xs text-gray-500 mt-1">{claim.explanation}</p>
+                  <p className={`mt-1 text-gray-500 ${surface === "sidepanel" ? "text-sm" : "text-xs"}`}>
+                    {claim.explanation}
+                  </p>
                   {claim.sources.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-2">
                       {claim.sources.map((src, j) => (
@@ -205,17 +225,17 @@ export function ClaimCardContent({ result, defaultExpanded = 0, inline = false }
                           target="_blank"
                           rel="noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="text-[10px] text-blue-500 underline truncate max-w-[180px]"
+                          className={`truncate text-blue-500 underline ${surface === "sidepanel" ? "max-w-[280px] text-xs" : "max-w-[180px] text-[10px]"}`}
                         >
                           {src}
                         </a>
                       ))}
                     </div>
                   )}
-                    <ProgressBar className="mt-2 progress-bar--sm" aria-label="Confidence" value={Math.round(claim.confidence * 100)}>
+                  <ProgressBar className="mt-2 progress-bar--sm" aria-label="Confidence" value={Math.round(claim.confidence * 100)}>
                     <Label className="text-[0.7rem] text-gray-400">Confidence Level</Label>
-                    <ProgressBar.Output className="text-[0.7rem] text-gray-400"/>
-                    <ProgressBar.Track >
+                    <ProgressBar.Output className="text-[0.7rem] text-gray-400" />
+                    <ProgressBar.Track>
                       <ProgressBar.Fill />
                     </ProgressBar.Track>
                   </ProgressBar>

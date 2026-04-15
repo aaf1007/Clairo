@@ -24,6 +24,45 @@ type ClaimAnalysis = {
   checkability: string;
 };
 
+type PanelTarget = {
+  tabId?: number;
+  windowId?: number;
+};
+
+async function resolvePanelTarget(target: PanelTarget = {}): Promise<{ windowId: number } | null> {
+  if (typeof target.windowId === "number") {
+    return { windowId: target.windowId };
+  }
+
+  const [activeTab] = await browser.tabs.query({
+    active: true,
+    currentWindow: true,
+  });
+
+  if (typeof activeTab?.windowId !== "number") {
+    return null;
+  }
+
+  return {
+    windowId: activeTab.windowId,
+  };
+}
+
+async function openVerifAISidePanel(target: PanelTarget = {}) {
+  try {
+    const resolvedTarget = await resolvePanelTarget(target);
+    if (!resolvedTarget) {
+      return;
+    }
+
+    await browser.sidePanel.open({
+      windowId: resolvedTarget.windowId,
+    });
+  } catch (error) {
+    console.error("[VerifAI] Failed to open sidepanel:", error);
+  }
+}
+
 // Handles Fact Checking requests to the backend
 async function runFactCheck(text: string, url?: string) {
   const factCheckRequest: FactCheckRequest = { text, url };
@@ -34,8 +73,6 @@ async function runFactCheck(text: string, url?: string) {
   await browser.storage.local.set({
     verifaiResults: [...existing, { status: "loading", result: null }],
   });
-
-  await browser.action.openPopup();
 
   try {
     const response = await fetch("http://localhost:8000/api/fact-check", {
@@ -71,8 +108,6 @@ async function handleVideoVerify(videoBase64: string, url: string, contentType: 
   await browser.storage.local.set({
     verifaiResults: [...existing, { status: "loading", result: null }],
   });
-
-  await browser.action.openPopup();
 
   try {
     const binary = atob(videoBase64);
@@ -110,8 +145,10 @@ async function handleVideoVerify(videoBase64: string, url: string, contentType: 
 export default defineBackground(() => {
   console.log("Hello background!", { id: browser.runtime.id });
 
-  // Point the side panel at the popup page so sidePanel.open() has a path to load.
-  browser.sidePanel.setOptions({ path: "popup.html", enabled: true });
+  void browser.sidePanel.setOptions({ path: "sidepanel.html", enabled: true });
+  void browser.sidePanel
+    .setPanelBehavior({ openPanelOnActionClick: true })
+    .catch((error) => console.error("[VerifAI] Failed to enable action click sidepanel behavior:", error));
 
   // Remove all existing menus then recreate. This handles both:
   // - Production: avoids duplicate-id errors when the service worker restarts
@@ -140,29 +177,36 @@ export default defineBackground(() => {
     const selectedText = info.selectionText;
     if (!selectedText) return;
 
+    await openVerifAISidePanel({
+      tabId: tab?.id,
+      windowId: tab?.windowId,
+    });
     await runFactCheck(selectedText, tab?.url);
   });
 
-  
-  browser.runtime.onMessage.addListener((msg) => {
+  browser.runtime.onMessage.addListener((msg, sender) => {
     if (msg.type === "TIKTOK_VERIFY") {
-      runFactCheck(msg.text, msg.url);
+      void openVerifAISidePanel({
+        tabId: sender.tab?.id,
+        windowId: sender.tab?.windowId,
+      });
+      void runFactCheck(msg.text, msg.url);
     }
   });
 
-  browser.runtime.onMessage.addListener((msg) => {
+  browser.runtime.onMessage.addListener((msg, sender) => {
     if (msg.type === "TIKTOK_VIDEO_VERIFY") {
-      handleVideoVerify(msg.videoBase64 as string, msg.url as string, msg.contentType as string);
+      void openVerifAISidePanel({
+        tabId: sender.tab?.id,
+        windowId: sender.tab?.windowId,
+      });
+      void handleVideoVerify(msg.videoBase64 as string, msg.url as string, msg.contentType as string);
     }
   });
 
-  // TODO: do this when integrating automatic sidebar panel open on user verify event
   browser.runtime.onMessage.addListener((msg, sender) => {
     if (msg.action === "openSideBar") {
-      // Guard for tab being undefined
-      if (!sender.tab?.windowId) return;
-
-      browser.sidePanel.open({
+      void openVerifAISidePanel({
         tabId: sender.tab?.id,
         windowId: sender.tab?.windowId,
       });

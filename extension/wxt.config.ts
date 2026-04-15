@@ -9,6 +9,9 @@ export default defineConfig({
   }),
   srcDir: "src",
   manifest: {
+    action: {
+      default_title: "Open VerifAI",
+    },
     permissions: ["contextMenus", "storage", "sidePanel"],
     host_permissions: ["http://localhost:8000/*"],
     web_accessible_resources: [

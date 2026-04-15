@@ -1,15 +1,16 @@
 import { Spinner } from "@/components/ui/spinner";
 import { motion } from "motion/react";
-import { ResultEntry } from "../App";
+import type { ResultEntry, Surface } from "../App";
 import { ClaimCardContent, VerdictBadge } from "./ClaimCard";
 
 type ClaimCardInlineProps = {
   entry: ResultEntry | undefined;
+  surface?: Surface;
   onChatAbout?: () => void;
 };
 
 /** Inline (non-modal) view of the most recent fact-check result for the Recent tab. */
-export function ClaimCardInline({ entry, onChatAbout }: ClaimCardInlineProps) {
+export function ClaimCardInline({ entry, surface = "popup", onChatAbout }: ClaimCardInlineProps) {
   if (!entry) return <EmptyState />;
   if (entry.status === "loading") return <LoadingState />;
   if (entry.status === "error") return <ErrorState />;
@@ -46,7 +47,7 @@ export function ClaimCardInline({ entry, onChatAbout }: ClaimCardInlineProps) {
       </div>
 
       {/* Shared content: summary + accordion claims */}
-      <ClaimCardContent result={result} inline />
+      <ClaimCardContent result={result} inline surface={surface} />
     </motion.div>
   );
 }

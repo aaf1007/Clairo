@@ -1,21 +1,16 @@
 @import "tailwindcss";
-@import "@heroui/styles"; 
+@import "@heroui/styles";
 
 :root {
   --gradient: linear-gradient(90deg, rgba(28, 4, 17, 1) 29%, rgba(124, 35, 83, 1) 56%, rgba(197, 95, 89, 1) 81%, rgba(210, 105, 116, 1) 100%);
 }
 
-body {
-  width: 440px;
-  height: 600px;
+.verifai-shell {
   font-size: 16px;
-  overflow: hidden;
-  scrollbar-width: none;
-  background-color: white;
 }
 
-body::-webkit-scrollbar {
-  display: none;
+.verifai-shell[data-surface="sidepanel"] {
+  background: white;
 }
 
 [data-slot="indicator"] {
@@ -123,8 +118,8 @@ body::-webkit-scrollbar {
 
 .heading {
   background: #1C0411;
-background: -webkit-linear-gradient(90deg, rgba(28, 4, 17, 1) 29%, rgba(124, 35, 83, 1) 56%, rgba(197, 95, 89, 1) 81%, rgba(210, 105, 116, 1) 100%);
-background: -moz-linear-gradient(90deg, rgba(28, 4, 17, 1) 29%, rgba(124, 35, 83, 1) 56%, rgba(197, 95, 89, 1) 81%, rgba(210, 105, 116, 1) 100%);
-background: linear-gradient(90deg, rgba(28, 4, 17, 1) 29%, rgba(124, 35, 83, 1) 56%, rgba(197, 95, 89, 1) 81%, rgba(210, 105, 116, 1) 100%);
-filter: progid:DXImageTransform.Microsoft.gradient(startColorstr="#1C0411", endColorstr="#D26974", GradientType=1);
+  background: -webkit-linear-gradient(90deg, rgba(28, 4, 17, 1) 29%, rgba(124, 35, 83, 1) 56%, rgba(197, 95, 89, 1) 81%, rgba(210, 105, 116, 1) 100%);
+  background: -moz-linear-gradient(90deg, rgba(28, 4, 17, 1) 29%, rgba(124, 35, 83, 1) 56%, rgba(197, 95, 89, 1) 81%, rgba(210, 105, 116, 1) 100%);
+  background: linear-gradient(90deg, rgba(28, 4, 17, 1) 29%, rgba(124, 35, 83, 1) 56%, rgba(197, 95, 89, 1) 81%, rgba(210, 105, 116, 1) 100%);
+  filter: progid:DXImageTransform.Microsoft.gradient(startColorstr="#1C0411", endColorstr="#D26974", GradientType=1);
 }
